@@ -1,10 +1,11 @@
 {
   "expo": {
-    "name": "app",
-    "slug": "app",
+    "name": "App TCP Uploader",
+    "slug": "appTcpUploader",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "primaryColor": "#ffffff",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -23,7 +24,8 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
-      }
+      },
+      "package": "com.adrieldev.appTcpUploader"
     },
     "web": {
       "favicon": "./assets/favicon.png"
