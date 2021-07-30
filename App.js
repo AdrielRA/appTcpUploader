@@ -12,6 +12,9 @@ import * as ImagePicker from "expo-image-picker";
 import WS from "react-native-websocket";
 import { BarCodeScanner } from "expo-barcode-scanner";
 import SnackBar from "react-native-snackbar-component";
+import * as Updates from "expo-updates";
+import { FontAwesome5 } from "@expo/vector-icons";
+import * as ImageManipulator from "expo-image-manipulator";
 
 LogBox.ignoreLogs(["Animated: `useNativeDriver`"]);
 
@@ -26,6 +29,10 @@ export default function App() {
   const [sending, setSending] = useState(false);
   const [showSnack, setShowSnack] = useState(false);
   const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    getUpdate();
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -48,6 +55,31 @@ export default function App() {
     if (!!base64) setSending(true);
   }, [base64]);
 
+  const getUpdate = async () => {
+    try {
+      const update = await Updates.checkForUpdateAsync();
+      if (update.isAvailable) {
+        await Updates.fetchUpdateAsync();
+        Alert.alert(
+          "Nova versão disponível:",
+          "Deseja instalar ela agora?",
+          [
+            {
+              text: "Não",
+              onPress: () => {},
+              style: "cancel",
+            },
+            {
+              text: "Sim",
+              onPress: async () => await Updates.reloadAsync(),
+            },
+          ],
+          { cancelable: false }
+        );
+      }
+    } catch {}
+  };
+
   const handleBarCodeScanned = ({ data }) => {
     setScanned(true);
     setIpAddress(data);
@@ -62,7 +94,13 @@ export default function App() {
     });
 
     if (!result.cancelled) {
-      setBase64(result.base64);
+      let res = await resizeImg(result);
+      console.log(
+        `Compressão: ${
+          (result.base64.length / (res.base64?.length || 1)) * 100
+        } %`
+      );
+      setBase64(res.base64);
     }
   };
 
@@ -75,8 +113,28 @@ export default function App() {
     });
 
     if (!result.cancelled) {
-      setBase64(result.base64);
+      let res = await resizeImg(result);
+      console.log(
+        `Compressão: ${
+          (result.base64.length / (res.base64?.length || 1)) * 100
+        } %`
+      );
+      setBase64(res.base64);
     }
+  };
+
+  const resizeImg = async (img) => {
+    let largestDimension = img.width > img.height ? "width" : "height";
+    let max = largestDimension === "width" ? img.width : img.height;
+    max = max < 1000 ? max : 1000;
+
+    const result = await ImageManipulator.manipulateAsync(
+      img.uri,
+      [{ resize: { [largestDimension]: max } }],
+      { compress: 0.7, format: ImageManipulator.SaveFormat.PNG, base64: true }
+    );
+
+    return result;
   };
 
   const sendImage = (client, image) => {
@@ -88,6 +146,12 @@ export default function App() {
       console.log("Done");
       process.exit(0);
     });
+  };
+
+  const handleReScan = () => {
+    setBase64(undefined);
+    setIpAddress(undefined);
+    setScanned(false);
   };
 
   return (
@@ -127,14 +191,45 @@ export default function App() {
                   <ActivityIndicator color="#fff" size="large" />
                 </View>
               ) : (
-                <>
-                  <TouchableOpacity onPress={pickImage} style={styles.btn}>
-                    <Text style={styles.txt}>Pegar da galeria</Text>
+                <View
+                  style={{
+                    paddingHorizontal: 20,
+                    alignSelf: "stretch",
+                    alignItems: "center",
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.txt,
+                      {
+                        fontSize: 20,
+                        textTransform: "uppercase",
+                        fontWeight: "700",
+                        marginBottom: 15,
+                      },
+                    ]}
+                  >
+                    Selecione uma imagem:
+                  </Text>
+                  <View style={styles.btnGroup}>
+                    <TouchableOpacity onPress={pickImage} style={styles.btn}>
+                      <FontAwesome5 name="images" size={75} color="#fff" />
+                      <Text style={styles.btnTxt}>Pegar da galeria</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={takePhoto} style={styles.btn}>
+                      <FontAwesome5 name="camera" size={75} color="#fff" />
+                      <Text style={styles.btnTxt}>Tirar foto</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <TouchableOpacity
+                    onPress={handleReScan}
+                    style={styles.btnOut}
+                  >
+                    <Text style={[styles.btnTxt, { marginTop: 0 }]}>
+                      Escanear QR novamente
+                    </Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={takePhoto} style={styles.btn}>
-                    <Text style={styles.txt}>Tirar foto</Text>
-                  </TouchableOpacity>
-                </>
+                </View>
               )}
 
               {base64 && (
@@ -228,13 +323,36 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   txt: { color: "#fff", fontSize: 15 },
+  btnGroup: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+  },
   btn: {
     backgroundColor: primary,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    width: "47%",
+    aspectRatio: 1,
     borderRadius: 5,
     marginVertical: 20,
     alignItems: "center",
     justifyContent: "center",
+  },
+  btnOut: {
+    backgroundColor: undefined,
+    width: "100%",
+    height: 60,
+    aspectRatio: undefined,
+    borderWidth: 1,
+    borderColor: primary,
+    borderRadius: 5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  btnTxt: {
+    color: "#fff",
+    textTransform: "uppercase",
+    textAlign: "center",
+    fontWeight: "700",
+    marginTop: 15,
   },
 });
