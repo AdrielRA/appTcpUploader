@@ -15,6 +15,7 @@ import SnackBar from "react-native-snackbar-component";
 import * as Updates from "expo-updates";
 import { FontAwesome5 } from "@expo/vector-icons";
 import * as ImageManipulator from "expo-image-manipulator";
+import NetInfo from "@react-native-community/netinfo";
 
 LogBox.ignoreLogs(["Animated: `useNativeDriver`"]);
 
@@ -25,6 +26,7 @@ export default function App() {
   const [ipAddress, setIpAddress] = useState();
   const [hasLibraryPermission, setHasLibraryPermission] = useState();
   const [hasScannerPermission, setHasScannerPermission] = useState();
+  const [isWiFi, setIsWiFi] = useState(true);
   const [scanned, setScanned] = useState(false);
   const [sending, setSending] = useState(false);
   const [showSnack, setShowSnack] = useState(false);
@@ -32,6 +34,15 @@ export default function App() {
 
   useEffect(() => {
     getUpdate();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      setIsWiFi(state.type === "wifi");
+      console.log("Connection type", state.type);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -50,10 +61,6 @@ export default function App() {
       }
     })();
   }, []);
-
-  useEffect(() => {
-    if (!!base64) setSending(true);
-  }, [base64]);
 
   const getUpdate = async () => {
     try {
@@ -87,13 +94,14 @@ export default function App() {
 
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       quality: 1,
       base64: true,
     });
 
     if (!result.cancelled) {
+      setSending(true);
       let res = await resizeImg(result);
       console.log(
         `Compressão: ${
@@ -106,13 +114,14 @@ export default function App() {
 
   const takePhoto = async () => {
     let result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       quality: 1,
       base64: true,
     });
 
     if (!result.cancelled) {
+      setSending(true);
       let res = await resizeImg(result);
       console.log(
         `Compressão: ${
@@ -154,6 +163,12 @@ export default function App() {
     setScanned(false);
   };
 
+  const handleCancelUpload = () => {
+    setBase64(null);
+    setHasError(true);
+    setSending(false);
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
@@ -183,12 +198,41 @@ export default function App() {
             </BarCodeScanner>
           ) : (
             <>
-              {sending ? (
-                <View>
-                  <Text style={[styles.txt, { marginBottom: 15 }]}>
-                    Enviando...
+              {!isWiFi ? (
+                <View style={{ alignItems: "center" }}>
+                  <FontAwesome5 name="wifi" size={75} color="#fff" />
+                  <Text style={[styles.txt, { marginTop: 30 }]}>
+                    Ative o wi-fi.
                   </Text>
-                  <ActivityIndicator color="#fff" size="large" />
+                </View>
+              ) : sending ? (
+                <View
+                  style={{
+                    alignSelf: "stretch",
+                    paddingHorizontal: 20,
+                    paddingVertical: 50,
+                    alignItems: "center",
+                    flex: 1,
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <View></View>
+                  <View>
+                    <Text style={styles.txt}>Enviando...</Text>
+                    <ActivityIndicator
+                      color="#fff"
+                      size="large"
+                      style={{ marginTop: 15 }}
+                    />
+                  </View>
+                  <TouchableOpacity
+                    onPress={handleCancelUpload}
+                    style={styles.btnOut}
+                  >
+                    <Text style={[styles.btnTxt, { marginTop: 0 }]}>
+                      Cancelar
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               ) : (
                 <View
@@ -229,6 +273,9 @@ export default function App() {
                       Escanear QR novamente
                     </Text>
                   </TouchableOpacity>
+                  <Text style={styles.txtSub}>
+                    {`Conectado à ${ipAddress?.replace("http://", "")}:${PORT}`}
+                  </Text>
                 </View>
               )}
 
@@ -322,7 +369,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
   },
-  txt: { color: "#fff", fontSize: 15 },
+  txt: { color: "#fff", fontSize: 15, textAlign: "center" },
+  txtSub: {
+    color: "#fff",
+    opacity: 0.5,
+    marginTop: 30,
+    fontSize: 10,
+  },
   btnGroup: {
     flexDirection: "row",
     justifyContent: "space-between",
